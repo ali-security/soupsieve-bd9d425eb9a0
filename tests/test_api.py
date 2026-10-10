@@ -590,6 +590,69 @@ class TestInvalid(util.TestCase):
         with self.assertRaises(TypeError):
             sv.filter('div', "not a tag", flags=flags)
 
+    def test_excessive_selectors(self):
+        """Test excessive selectors."""
+
+        # Build a 500 KB selector string: "a,a,a,...,a" (250,000 items)
+        count = 10000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile(selector)
+
+    def test_excessive_custom_selectors(self):
+        """Test excessive custom selectors."""
+
+        # Build a 500 KB selector string: "a,a,a,...,a" (250,000 items)
+        count = 10000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile('div:--custom', custom={':--custom': selector})
+
+    def test_excessive_custom_and_normal_selectors(self):
+        """Test excessive custom and normal selectors."""
+
+        count = 5000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile(f':is({selector}):--custom', custom={':--custom': selector})
+
+    def test_excessive_repeated_custom_selectors(self):
+        """Test that repeatedly referencing a small custom selector counts toward the limit."""
+
+        # Each reference to the custom selector contributes its full selector count.
+        selector = ",".join("a" for _ in range(100))
+
+        with self.assertRaises(ValueError):
+            sv.compile('div' + ':--custom' * 200, custom={':--custom': selector})
+
+    def test_excessive_builtin_pseudo_class_selectors(self):
+        """Test that repeatedly using pseudo-classes backed by precompiled selector lists counts toward the limit."""
+
+        with self.assertRaises(ValueError):
+            sv.compile('input' + ':read-only' * 1000)
+
+    def test_selectors_within_limit(self):
+        """Test that selectors within the limit still compile and match."""
+
+        markup = """
+        <div>
+        <a id="1"></a>
+        <span id="2"></span>
+        </div>
+        """
+
+        count = 8000
+        selector = ",".join("a" for _ in range(count))
+
+        soup = self.soup(markup, 'html.parser')
+        self.assertEqual([el['id'] for el in sv.select(selector, soup)], ['1'])
+
 
 class TestSyntaxErrorReporting(util.TestCase):
     """Test reporting of syntax errors."""
